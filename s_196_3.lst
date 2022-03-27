@@ -1,0 +1,412 @@
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 1 - 3/18/2022 1:35:59
+
+
+       1/       0 :                     ;       EV96 module main
+       2/       0 :                     ;       ================
+       3/       0 :                     ;
+       4/       0 :                     ; This file contains a code to operate the 87C196KC mx board.
+       5/       0 :                     ; Reset location is (2080H).
+       6/       0 :                     ;
+       7/       0 :                     ; The serial link is provided by an internal UART. 
+       8/       0 :                     ;
+       9/       0 :                     ;
+      10/       0 :                     ;   Memory partitions
+      11/       0 :                     ;                         (0000H-0017H) I/O control registersor SFRs (internal RAM)
+      12/       0 :                     ;                         (0018H-0019H) STACK POINTER (internal RAM)
+      13/       0 :                     ;                         (001AH-00FFH) INTERNAL DATA MEMORY 
+      14/       0 :                     ;                         (0100H-1FFDH) EXTERNAL MEMORY OR I/O                         
+      15/       0 :                     ;                         (1FFEH-1FFFH) PORT 3 AND PORT 4
+      16/       0 :                     ;                         (2000H-2013H) INTERRUPT VECTORS
+      17/       0 :                     ;                               (2014H) PPW
+      18/       0 :                     ;                         (2015H-2017H) RESERVED
+      19/       0 :                     ;                               (2018H) CHIP CONFIGURATION BYTE
+      20/       0 :                     ;                         (2019H-201FH) RESERVED
+      21/       0 :                     ;                         (2020H-202FH) SECURITY KEY
+      22/       0 :                     ;                         (2030H-203FH) INTERRUPT VECTORS
+      23/       0 :                     ;                         (2040H-206FH) RESERVED
+      24/       0 :                     ;                         (2070H-2071H) SIGNATURE WORD
+      25/       0 :                     ;                         (2072H-2073H) VOLTAGE LEVELS
+      26/       0 :                     ;                         (2074H-207FH) RESERVED
+      27/       0 :                     ;                         (2080H-7FFFH) ROM 
+      28/       0 :                     ;						  (8000H-FFFFH) RAM		
+      29/       0 :                     ;
+      30/       0 :                     ;               ( Note that all of these partitions, (except 1D00H-1EFFH and 
+      31/       0 :                     ;                 2018H), are reserved by the MCS-96 architecture. )
+      32/       0 :                     ; 
+      33/       0 :                     	cpu	80196
+      34/       0 :                     	
+      35/       0 :                     ;	QWER: equ  78H
+      36/       0 :                     
+      37/       0 :                     	org 00h
+      38/       0 :                     	
+      39/       0 : FF                  	db 0ffh
+      40/       1 :                     ;
+      41/       1 :                     
+      42/      28 :                     	org 28h
+      43/      28 :                     
+      44/      28 : FF                  chr:  		db 0FFh
+      45/      29 : FF                  sptemp: 	db 0FFh
+      46/      2A : FF                  temp0:  	db 0FFh
+      47/      2B : FF                  temp1:  	db 0FFh
+      48/      2C : FF                  rcv_flag: 	db 0FFh
+      49/      2D :                     
+      50/      2D : FF                  temp3		db 0FFh
+      51/      2E : FF                  temp4		db 0FFh
+      52/      2F : FF                  tempio		db 0FFh
+      53/      30 : FF FF               COUNT       dw 0FFFFh
+      54/      32 :                     ;
+      55/    200C :                     	org 200ch
+      56/    200C :                     	
+      57/    200C : C8 20               	dw ser_port_int
+      58/    200E :                     ;
+      59/    2080 :                     	org 2080H
+      60/    2080 :                     	
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 2 - 3/18/2022 1:35:59
+
+
+      61/    2080 :                     ;
+      62/    2080 :                     ; Define symbols for the register mapped I/O locations
+      63/    2080 :                     ; ----------------------------------------------------
+      64/    2080 :                     ;
+      65/    2080 : =0H                  zero            equ   00H      ; R/W   Zero Register
+      66/    2080 : =2H                  ad_command      equ   02H      ;   W   A to D command register
+      67/    2080 : =2H                  ad_result_lo    equ   02H      ; R     Low byte of result and channel 
+      68/    2080 : =3H                  ad_result_hi    equ   03H      ; R     High byte of result
+      69/    2080 : =3H                  hsi_mode        equ   03H      ;   W   Controls HSI transition detector
+      70/    2080 : =4H                  hsi_time        equ   04H      ; R     HSI time tag
+      71/    2080 : =4H                  hso_time        equ   04H      ;   W   HSO time tag  
+      72/    2080 : =6H                  hsi_status      equ   06H      ; R     HSI status register (reads fifo)
+      73/    2080 : =6H                  hso_command     equ   06H      ;   W   HSO command tag
+      74/    2080 : =7H                  sbuf            equ   07H      ; R/W   Serial port buffer
+      75/    2080 : =8H                  int_mask        equ   08H      ; R/W   Interrupt mask register
+      76/    2080 : =9H                  int_pending     equ   09H      ; R/W   Interrupt pending register
+      77/    2080 : =11H                 spcon           equ   11H      ;   W   Serial port control register 
+      78/    2080 : =11H                 spstat          equ   11H      ; R     Serial port status register
+      79/    2080 : =0AH                 watchdog        equ   0AH      ;   W   Watchdog timer
+      80/    2080 : =0AH                 timer1          equ   0AH      ; R     Timer1 register
+      81/    2080 : =0CH                 timer2          equ   0CH      ; R     Timer2 register
+      82/    2080 : =0EH                 port0           equ   0EH      ; R     I/O port 0
+      83/    2080 : =0EH                 baud_reg        equ   0EH      ;   W   Baud rate register
+      84/    2080 : =0FH                 ioport1         equ   0FH      ; R/W   I/O port 1
+      85/    2080 : =10H                 ioport2         equ   10H      ; R/W   I/O port 2
+      86/    2080 : =15H                 ioc0            equ   15H      ;   W   I/O control register 0 (HSI/O)
+      87/    2080 : =15H                 ios0            equ   15H      ; R     I/O status register 0
+      88/    2080 : =16H                 ioc1            equ   16H      ;   W   I/O control register 1 (Port2)
+      89/    2080 : =16H                 ios1            equ   16H      ; R     I/O status register 1
+      90/    2080 : =17H                 pwm_control     equ   17H      ;   W   PWM control register 
+      91/    2080 : =18H                 sp              equ   18H      ; R/W   System stack pointer
+      92/    2080 :                     ;
+      93/    2080 :                     ; This section defines utility macros non-specific to this program
+      94/    2080 :                     ; ----------------------------------------------------------------
+      95/    2080 :                     ;
+      96/    2080 :                     DEFINE_BIT      macro   name,bitnum
+      97/    2080 :                                     name    equ bitnum
+      98/    2080 :                                     endm
+      99/    2080 :                     
+     100/    2080 :                     SET_BIT         macro   regnum,bitnum
+     101/    2080 :                                     orb     regnum,#( 1 SHL (bitnum mod 8)  )
+     102/    2080 :                                     endm
+     103/    2080 :                     
+     104/    2080 :                     CLR_BIT         macro   regnum,bitnum
+     105/    2080 :                                     andb    regnum,#not( 1 SHL (bitnum mod 8) )
+     106/    2080 :                                     endm
+     107/    2080 :                     
+     108/    2080 :                     ; BL             macro   label
+     109/    2080 :                     ;                bnc     label
+     110/    2080 :                     ;                endm
+     111/    2080 :                     ;$eject
+     112/    2080 :                     ;
+     113/    2080 :                     ; This section contains EQUates which may change with different versions
+     114/    2080 :                     ; ----------------------------------------------------------------------
+     115/    2080 :                     ;
+     116/    2080 :                     ;;;;;;;;;offset  equ     8000H           ; Code offset before REMAP           
+     117/    2080 :                     ;
+     118/    2080 :                     ; Tell the commands what to use for psw while monitor is running
+     119/    2080 :                     ;
+     120/    2080 :                     ;;;;;;;;;;;;;;;rism_psw	equ	0000H		; No Interrupts enabled
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 3 - 3/18/2022 1:35:59
+
+
+     121/    2080 :                     ;
+     122/    2080 :                     ; This section contains several macros generate specifically for this program
+     123/    2080 :                     ; ---------------------------------------------------------------------------
+     124/    2080 :                     ;
+     125/    2080 :                     ; ENTER_RISM
+     126/    2080 :                     ;       A macro which generates the prologue for the RISM ISR
+     127/    2080 :                     ;
+     128/    2080 :                     ; EXIT_RISM
+     129/    2080 :                     ;       A macro which generates the epilogue for the RISM ISR
+     130/    2080 :                     ;
+     131/    2080 :                     ; SEND_DATA_BYTE
+     132/    2080 :                     ;       A macro which passes the lower eight bits of RISM_DATA to
+     133/    2080 :                     ;       the serial port, it assumes the port is ready for data
+     134/    2080 :                     ;
+     135/    2080 :                     ; BYTE_PROTECT
+     136/    2080 :                     ;       A macro which terminates the RISM ISR if the RISM is about
+     137/    2080 :                     ;       to write into a byte it should not modify.
+     138/    2080 :                     ;
+     139/    2080 :                     ; WORD_PROTECT
+     140/    2080 :                     ;       A macro which terminates the RISM ISR if the RISM is about
+     141/    2080 :                     ;       to write into a word it should not modify.
+     142/    2080 :                     ;
+     143/    2080 :                     ; DWORD_PROTECT
+     144/    2080 :                     ;       A macro which terminates the RISM ISR if the RISM is about
+     145/    2080 :                     ;       to write into a double-word it should not modify.
+     146/    2080 :                     ;
+     147/    2080 :                     ;$eject
+     148/    2080 :                     ENTER_RISM      macro
+     149/    2080 :                                     pushf
+     150/    2080 :                                     endm
+     151/    2080 :                                     
+     152/    2080 :                     EXIT_RISM       macro
+     153/    2080 :                                     popf
+     154/    2080 :                                     ret
+     155/    2080 :                                     endm
+     156/    2080 :                     
+     157/    2080 :                     SEND_DATA_BYTE  macro
+     158/    2080 :                                     stb     RISM_DATA, txd_rxd[0]
+     159/    2080 :                                     endm
+     160/    2080 :                     
+     161/    2080 :                     BYTE_PROTECT    macro                   ; No special protection
+     162/    2080 :                                     endm
+     163/    2080 :                     
+     164/    2080 :                     WORD_PROTECT    macro                   ; No special protection               
+     165/    2080 :                                     endm
+     166/    2080 :                     
+     167/    2080 :                     DWORD_PROTECT   macro                   ; No special protection
+     168/    2080 :                                     endm
+     169/    2080 :                     ;;$eject
+     170/    2080 :                     ;
+     171/    2080 :                     ; These registers are used only by the diagnostic routines.
+     172/    2080 :                     ; ---------------------------------------------------------
+     173/    2080 :                     ; They are not required for normal execution.
+     174/    2080 :                     ;
+     175/    2080 :                         org 2080h
+     176/    2080 :                     ;	-----------
+     177/    2080 :                     
+     178/    2080 : A1 00 E1 18         	ld	sp, #0E100h
+     179/    2084 : B1 20 16            	ldb	ioc1, #00100000b
+     180/    2087 :                     
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 4 - 3/18/2022 1:35:59
+
+
+     181/    2087 : =80H                 baud_high	equ 80h
+     182/    2087 : =4DH                 baud_low	equ	4dh
+     183/    2087 :                      	
+     184/    2087 : B1 4D 0E            	ldb	baud_reg, #baud_low
+     185/    208A : B1 80 0E            	ldb	baud_reg, #baud_high
+     186/    208D :                     	
+     187/    208D : B1 49 11            	ldb spcon,	#01001001b
+     188/    2090 :                     	
+     189/    2090 : C4 28 07            	stb	sbuf, chr
+     190/    2093 : C7 01 00 81 28      	stb	chr, 8100h
+     191/    2098 : B3 01 00 81 28      	ldb chr, 8100h
+     192/    209D : B1 20 2A            	ldb	temp0, #00100000b
+     193/    20A0 :                     	
+     194/    20A0 : B1 40 08            	ldb	int_mask, #01000000b
+     195/    20A3 : FB                  	ei
+     196/    20A4 :                     	
+     197/    20A4 : B0 10 2F            	LDB  tempio, IOPORT2
+     198/    20A7 : 95 40 2F            	XORB tempio, #01000000B
+     199/    20AA :                     ;	ORB  tempio, #10000000B
+     200/    20AA : C4 10 2F            	STB  tempio, IOPORT2
+     201/    20AD :                     	
+     202/    20AD :                     loop:
+     203/    20AD :                     ;	
+     204/    20AD : A1 FF 00 30         	LD COUNT, #0FFh
+     205/    20B1 :                     ;
+     206/    20B1 : B0 10 2F            	LDB  tempio, IOPORT2
+     207/    20B4 : 95 40 2F            	XORB tempio, #01000000B
+     208/    20B7 :                     ;	ORB  tempio, #10000000B
+     209/    20B7 : C4 10 2F            	STB  tempio, IOPORT2
+     210/    20BA :                     ;
+     211/    20BA :                     LOOP2:
+     212/    20BA :                     ;
+     213/    20BA : E0 30 FD            	DJNZ COUNT, LOOP2 ;loop 0FFh times
+     214/    20BD :                     ;	
+     215/    20BD : B0 10 2F            	LDB  tempio, IOPORT2
+     216/    20C0 : 95 40 2F            	XORB tempio, #01000000B
+     217/    20C3 :                     ;	ORB  tempio, #10000000B
+     218/    20C3 : C4 10 2F            	STB  tempio, IOPORT2	
+     219/    20C6 :                     ;	
+     220/    20C6 : 27 E5               	br loop
+     221/    20C8 :                     	
+     222/    20C8 :                     ser_port_int:
+     223/    20C8 : F2                  	pushf
+     224/    20C9 :                     	
+     225/    20C9 :                     rd_again:
+     226/    20C9 : B0 11 29            	ldb		sptemp, spstat
+     227/    20CC : 90 29 2A            	orb		temp0, sptemp
+     228/    20CF : 71 60 29            	andb	sptemp, #01100000b
+     229/    20D2 : D7 F5               	jne		rd_again
+     230/    20D4 :                     	
+     231/    20D4 :                     get_byte:
+     232/    20D4 : 36 2A 13            	jbc		temp0, 6, put_byte
+     233/    20D7 : C4 28 07            	stb		sbuf, chr
+     234/    20DA : C7 01 00 82 28      	stb	chr, 8200h
+     235/    20DF : B3 01 00 82 28      	ldb chr, 8200h
+     236/    20E4 : 71 BF 2A            	andb	temp0, #10111111b
+     237/    20E7 : B1 FF 2C            	ldb		rcv_flag, #0FFh
+     238/    20EA :                     	
+     239/    20EA :                     put_byte:
+     240/    20EA : 30 2C 52            	jbc		rcv_flag, 0, continue
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 5 - 3/18/2022 1:35:59
+
+
+     241/    20ED : 35 2A 4F            	jbc		temp0, 5, continue
+     242/    20F0 : B0 28 07            	ldb		sbuf, chr
+     243/    20F3 : 71 DF 2A            	andb	temp0, #11011111b
+     244/    20F6 :                     	
+     245/    20F6 :                     ;	andb	chr, #01111111b
+     246/    20F6 : 71 7F 28            	andb	chr, #01111111b
+     247/    20F9 : 99 0D 28            	cmpb	chr, #0Dh
+     248/    20FC : D7 05               	jne		clr_rcv
+     249/    20FE : B1 0A 28            	ldb		chr, #0Ah
+     250/    2101 : 20 3C               	br		continue
+     251/    2103 :                     	
+     252/    2103 :                     clr_rcv:
+     253/    2103 :                     ;	
+     254/    2103 :                     ;                            I/O Test is OK		
+     255/    2103 :                     ;
+     256/    2103 : 99 31 28            	cmpb	chr, #31h
+     257/    2106 : D7 07               	jne		n_c1
+     258/    2108 : B3 01 00 C0 2D      	ldb		temp3, 0C000H    ;-4000H Read from D71055C (2)
+     259/    210D : 20 2E               	br      clr_rcv2
+     260/    210F :                     n_c1:	
+     261/    210F : 99 32 28            	cmpb	chr, #32h
+     262/    2112 : D7 07               	jne		n_c2
+     263/    2114 : B3 01 00 C8 2D      	ldb		temp3, 0C800H    ;-3800H Read from D71055C (1)	
+     264/    2119 : 20 22               	br      clr_rcv2
+     265/    211B :                     n_c2:	
+     266/    211B : 99 33 28            	cmpb	chr, #33h
+     267/    211E : D7 07               	jne		n_c3
+     268/    2120 : B3 01 00 D0 2D      	ldb		temp3, 0D000H    ;-3000HRead from ADC TC7109
+     269/    2125 : 20 16               	br      clr_rcv2
+     270/    2127 :                     n_c3:	
+     271/    2127 : 99 34 28            	cmpb	chr, #34h
+     272/    212A : D7 07               	jne		n_c4
+     273/    212C : B3 01 00 D8 2D      	ldb		temp3, 0D800H    ;-2800HRead from READY
+     274/    2131 : 20 0A               	br      clr_rcv2
+     275/    2133 :                     n_c4:	
+     276/    2133 : 99 35 28            	cmpb	chr, #35h
+     277/    2136 : D7 05               	jne		clr_rcv2
+     278/    2138 : B3 01 00 E0 2D      	ldb		temp3, 0E000H    ;-2000H Read from RAM
+     279/    213D :                     ;	
+     280/    213D :                     ;	
+     281/    213D :                     clr_rcv2:
+     282/    213D : 11 2C               	clrb	rcv_flag
+     283/    213F :                     	
+     284/    213F :                     continue:
+     285/    213F : F3                  	popf
+     286/    2140 : F0                  	ret
+     287/    2141 :                     	
+     288/    2141 :                     
+     289/    2141 :                     	
+     290/    2141 :                     
+     291/    2141 :                     
+     292/    2141 :                     
+     293/    2141 :                     
+     294/    2141 :                     
+     295/    2141 :                     
+     296/    2141 :                     
+     297/    2141 :                     
+     298/    2141 :                     
+     299/    2141 :                     
+     300/    2141 :                     
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 6 - 3/18/2022 1:35:59
+
+
+     301/    2141 :                     
+     302/    2141 :                     
+     303/    2141 :                     
+     304/    2141 :                     
+     305/    2141 :                     
+     306/    2141 :                     
+     307/    2141 :                     
+     308/    2141 :                     
+     309/    2141 :                     
+     310/    2141 :                     
+     311/    2141 :                     
+     312/    2141 :                     
+     313/    2141 :                     
+     314/    2141 :                     
+     315/    2141 :                     	
+     316/    2141 :                     	
+     317/    2141 :                     
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 7 - 3/18/2022 1:35:59
+
+
+  Symbol Table (* = unused):
+  --------------------------
+
+*AD_COMMAND :                     2 - | *AD_RESULT_HI :                   3 - |
+*AD_RESULT_LO :                   2 - |
+*ARCHITECTURE :                                        "i386-unknown-win32" - |
+ BAUD_HIGH :                     80 - |  BAUD_LOW :                      4D - |
+ BAUD_REG :                      0E - | *CASESENSITIVE :                  0 - |
+ CHR :                           28 C |  CLR_RCV :                     2103 C |
+ CLR_RCV2 :                    213D C | *COMPMODE :                       0 - |
+*CONSTPI :        3.141592653589793 - |  CONTINUE :                    213F C |
+ COUNT :                         30 C | *DATE :                 "3/18/2022" - |
+*FALSE :                          0 - | *FULLPMMU :                       1 - |
+*GET_BYTE :                    20D4 C | *HAS64 :                          0 - |
+*HASFPU :                         0 - | *HASPMMU :                        0 - |
+*HSI_MODE :                       3 - | *HSI_STATUS :                     6 - |
+*HSI_TIME :                       4 - | *HSO_COMMAND :                    6 - |
+*HSO_TIME :                       4 - | *INSUPMODE :                      0 - |
+ INT_MASK :                       8 - | *INT_PENDING :                    9 - |
+*IOC0 :                          15 - |  IOC1 :                          16 - |
+*IOPORT1 :                       0F - |  IOPORT2 :                       10 - |
+*IOS0 :                          15 - | *IOS1 :                          16 - |
+*LISTON :                         1 - |  LOOP :                        20AD C |
+ LOOP2 :                       20BA C | *MACEXP :                         7 - |
+*MOMCPU :                     80196 - | *MOMCPUNAME :               "80196" - |
+*NESTMAX :                      100 - |  N_C1 :                        210F C |
+ N_C2 :                        211B C |  N_C3 :                        2127 C |
+ N_C4 :                        2133 C | *PADDING :                        1 - |
+*PORT0 :                         0E - |  PUT_BYTE :                    20EA C |
+*PWM_CONTROL :                   17 - |  RCV_FLAG :                      2C C |
+ RD_AGAIN :                    20C9 C | *RELAXED :                        0 - |
+ SBUF :                           7 - |  SER_PORT_INT :                20C8 C |
+ SP :                            18 - |  SPCON :                         11 - |
+ SPSTAT :                        11 - |  SPTEMP :                        29 C |
+ TEMP0 :                         2A C | *TEMP1 :                         2B C |
+ TEMP3 :                         2D C | *TEMP4 :                         2E C |
+ TEMPIO :                        2F C | *TIME :                   "1:35:59" - |
+*TIMER1 :                        0A - | *TIMER2 :                        0C - |
+*TRUE :                           1 - | *VERSION :                     142F - |
+*WATCHDOG :                      0A - | *ZERO :                           0 - |
+
+     72 symbols
+     43 unused symbols
+
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 8 - 3/18/2022 1:35:59
+
+
+  Defined Macros:
+  ---------------
+
+BYTE_PROTECT                          | CLR_BIT                              
+DEFINE_BIT                            | DWORD_PROTECT                        
+ENTER_RISM                            | EXIT_RISM                            
+SEND_DATA_BYTE                        | SET_BIT                              
+WORD_PROTECT                          |
+
+      9 macros
+
+ AS V1.42 Beta [Bld 219] - Source File s_196_3.asm - Page 9 - 3/18/2022 1:35:59
+
+
+  Code Pages:
+  ----------
+
+STANDARD (0 changed characters)
+
+1 code page
+
+0.01 seconds assembly time
+
+    317 lines source file
+      2 passes
+      0 errors
+      0 warnings

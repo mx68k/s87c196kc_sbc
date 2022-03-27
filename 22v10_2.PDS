@@ -1,0 +1,55 @@
+;PALASM Design Description
+
+;---------------------------------- Declaration Segment ------------
+TITLE    S87C196KC address decoder for mx board
+PATTERN  Non Latched
+REVISION 0
+AUTHOR   mx
+COMPANY
+DATE     03/17/22
+
+CHIP MYPAL1  PALCE22V10                             ; Device not selected
+
+;---------------------------------- PIN Declarations ---------------
+;PIN 1  CLK                                 ; COMBINATORIAL 
+
+PIN 1   A15                     COMBINATORIAL                           ; REGISTERED 
+;Pin 2   A2         COMBINATORIAL
+;Pin 3   A3          COMBINATORIAL
+;Pin 4   A11          COMBINATORIAL
+;Pin 5   A12          COMBINATORIAL
+;Pin 6   A13          COMBINATORIAL
+;Pin 7   A14          COMBINATORIAL
+;Pin 8   A15          COMBINATORIAL
+;Pin 9   A4          COMBINATORIAL
+;Pin 10 A5          COMBINATORIAL
+;Pin 11 A6          COMBINATORIAL
+Pin 12  GND
+;Pin 13 A7         COMBINATORIAL
+;Pin 14 A8         COMBINATORIAL
+;Pin 15 A9         COMBINATORIAL
+;Pin 16 A10         COMBINATORIAL
+;Pin 17  IO1      COMBINATORIAL                          
+;Pin 18  IO2      COMBINATORIAL                    
+;Pin 19  IO3      COMBINATORIAL                       
+;Pin 20  IO4      COMBINATORIAL                      
+;Pin 21  IO5      COMBINATORIAL                 
+Pin 22  RAM              COMBINATORIAL
+Pin 23  ROM      COMBINATORIAL
+;----------------------------------- Boolean Equation Segment ------
+
+EQUATIONS
+
+;o7 :=  o7 :+: (o6 * o5 * o4 * o3 * o2 * o1 * o0) ; Use ":=" For REGISTERED Equation
+
+/ROM =  /A15 
+/RAM =  A15
+;/IO4 =  A15 * A14 * /A13 * /A12 * /A11 ; C000h
+;/IO3 =  A15 * A14 * /A13 * /A12 * A11 ; C800h
+;/IO2 =  A15 * A14 * /A13 * A12 * /A11 ; D000h
+;/IO1 =  A15 * A14 * /A13 * A12 * A11 ; D800h
+
+
+
+
+
