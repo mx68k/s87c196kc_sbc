@@ -11,6 +11,3 @@ s87c196kc_sbc_top
 s87c196kc_sbc_bot   
 ![s87c196kc_sbc_bot](/s87c196kc_sbc_bot.jpg)
 
-## Current status
-
-start
